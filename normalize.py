@@ -86,6 +86,8 @@ def main():
     if args.flavor == "log1pCP10k":
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
+    elif args.flavor == "analyticalPearsonResiduals":
+        sc.experimental.pp.normalize_pearson_residuals(adata)
     else:
         raise ValueError(f"Unknown flavor: {args.flavor}")
 
