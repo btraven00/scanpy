@@ -35,9 +35,17 @@ parser advertises a solver this module cannot deliver.
 
 WHY sklearn refuses: PCA must mean-centre, and for sparse input the centring
 has to stay implicit — arpack does it through a LinearOperator, covariance_eigh
-through the Gram matrix. The randomized path calls randomized_svd on the
+through the Gram matrix. sklearn's randomized path calls randomized_svd on the
 centred matrix, which would mean materialising X - mean, i.e. densifying. So
 sklearn rejects it rather than silently blowing up memory.
+
+This is an sklearn-PCA limitation, NOT a mathematical one. Implicit centring
+composes fine with a randomised range finder — (X - 1 mu^T) O = X O - 1 (mu^T O),
+all matvecs — which is how R's irlba does it via center=. Demonstrated by the
+benchmark's own sibling modules, all on the same sparse CSR input and without
+densifying: rapids-singlecell randomized-halko (seed-sensitive), scrapper
+random (seed-sensitive), and sklearn's own TruncatedSVD with
+algorithm="randomized" (which is allowed precisely because it does not centre).
 
 Measured on be1 (1715 x 2000), n_comps=10, vs sparse arpack:
     dense full          1.0e-12   (a third exact solver; adds nothing)
@@ -48,9 +56,15 @@ agrees with arpack to 8e-13, so on sparse input the solver axis is degenerate.
 
 FIX OPTIONS, in increasing order of work:
   1. Drop "randomized" from choices — stop advertising it. Honest, one line.
-  2. Densify only when solver == randomized, and document the memory cost
-     (27MB for be1, ~2.5GB for pbmc at 157k x 2000). This is the one that buys
-     a real approximate-solver arm and a real seed axis for the benchmark.
+  2. Densify only when solver == randomized, documenting the memory cost
+     (27MB for be1, ~2.5GB for pbmc at 157k x 2000). Buys a CPU approximate arm
+     with a real seed axis -- but note the benchmark ALREADY has approximate,
+     seed-sensitive arms from scrapper random (CPU) and rapids randomized-halko
+     (GPU), so this is a second one, not the only one.
+  2b. Better if the arm is wanted: implement implicit centring around a
+     randomised range finder, as irlba does, and keep the input sparse. More
+     work than densifying, but it is the thing sklearn is missing rather than a
+     workaround for it.
   3. Expose covariance_eigh instead — but it is numerically the same as arpack
      here, so it adds a job, not information.
 """
