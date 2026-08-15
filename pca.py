@@ -17,6 +17,42 @@ Implementation notes
   No per-gene variance scaling — matches scrapper/rapids-singlecell. If
   alternative scaling is needed later, expose it as a new --pca_type variant
   rather than as an independent flag.
+
+--solver randomized IS SILENTLY IGNORED (measured 2026-08-15)
+------------------------------------------------------------
+This module always feeds sc.pp.pca a SPARSE matrix (load_matrix returns CSR),
+and sklearn's PCA accepts only {'arpack', 'covariance_eigh'} for sparse input.
+scanpy therefore coerces svd_solver='randomized' to 'arpack' and warns:
+
+    UserWarning: Ignoring svd_solver='randomized' and using arpack,
+    sklearn.decomposition._pca.PCA (with sparse input) only supports
+    dict_keys(['arpack', 'covariance_eigh'])
+
+The warning goes to stderr and is invisible in benchmark results, so the
+'randomized' arm has been producing byte-identical output to 'arpack' — a
+duplicate job, not a second solver. `choices=["arpack", "randomized"]` in the
+parser advertises a solver this module cannot deliver.
+
+WHY sklearn refuses: PCA must mean-centre, and for sparse input the centring
+has to stay implicit — arpack does it through a LinearOperator, covariance_eigh
+through the Gram matrix. The randomized path calls randomized_svd on the
+centred matrix, which would mean materialising X - mean, i.e. densifying. So
+sklearn rejects it rather than silently blowing up memory.
+
+Measured on be1 (1715 x 2000), n_comps=10, vs sparse arpack:
+    dense full          1.0e-12   (a third exact solver; adds nothing)
+    dense randomized    9.9e-4    (genuinely different)
+    dense randomized, seed 42 vs 43   1.7e-3   (genuinely seed-sensitive)
+Note the seed effect exceeds the approximation bias. Also covariance_eigh
+agrees with arpack to 8e-13, so on sparse input the solver axis is degenerate.
+
+FIX OPTIONS, in increasing order of work:
+  1. Drop "randomized" from choices — stop advertising it. Honest, one line.
+  2. Densify only when solver == randomized, and document the memory cost
+     (27MB for be1, ~2.5GB for pbmc at 157k x 2000). This is the one that buys
+     a real approximate-solver arm and a real seed axis for the benchmark.
+  3. Expose covariance_eigh instead — but it is numerically the same as arpack
+     here, so it adds a job, not information.
 """
 
 import argparse
