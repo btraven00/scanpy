@@ -70,6 +70,7 @@ FIX OPTIONS, in increasing order of work:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -78,6 +79,7 @@ import numpy as np
 import scipy.sparse as sp
 import anndata as ad
 import scanpy as sc
+from threadpoolctl import threadpool_limits
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))  # vendored `common` (src/common) + module-local writers
 from common import cli  # noqa: E402
@@ -94,7 +96,17 @@ def parse_args():
     cli.add_base_args(p)             # --output_dir, --name
     cli.add_stage_args(p, "PCA")     # --normalized_selected_h5
     p.add_argument("--solver", type=str, required=True,
-                   choices=["arpack", "randomized"], help="PCA solver")
+                   choices=["arpack", "randomized", "full"], help="PCA solver")
+    # Dense vs sparse is its own axis, not a side effect of the solver: the
+    # paper contrasts the two, and only the dense path puts real work through
+    # BLAS-3. Materialised in the loader so peak RSS reflects the format under
+    # test instead of holding a sparse and a dense copy at once.
+    p.add_argument("--dense", type=str, default="false", choices=["true", "false"],
+                   help="materialise the matrix dense before PCA")
+    # Snakemake exports OMP_NUM_THREADS = <rule threads> (default 1), pinning
+    # the BLAS to one thread whichever implementation is linked. 0 = inherit.
+    p.add_argument("--blas_threads", type=int, default=0,
+                   help="BLAS threads (0 = inherit OMP_NUM_THREADS)")
     p.add_argument("--n_components", type=int, required=True,
                    help="Number of principal components to compute")
     p.add_argument("--random_seed", type=int, required=True,
@@ -102,7 +114,7 @@ def parse_args():
     return p.parse_args()
 
 
-def load_matrix(h5_path):
+def load_matrix(h5_path, dense=False):
     with h5py.File(h5_path, "r") as h5:
         g = h5["matrix"]
         data = g["data"][:]
@@ -113,6 +125,11 @@ def load_matrix(h5_path):
         cell_ids = g["barcodes"][:].astype(str)
 
     X = sp.csc_matrix((data, indices, indptr), shape=shape).T.tocsr()  # cells x genes
+    if dense:
+        # Drop the sparse copy before AnnData is built, so peak reflects one
+        # representation rather than both.
+        X = X.toarray()
+        print(f"  dense matrix: {X.nbytes / 1e6:.0f} MB")
     adata = ad.AnnData(X=X)
     adata.obs_names = cell_ids
     adata.var_names = gene_ids
@@ -126,7 +143,12 @@ def run_pca(adata, args):
     #chunked = args.chunked == "true"
     chunked = False
 
-    sc.pp.pca(
+    limits = args.blas_threads if args.blas_threads > 0 else None
+    if limits:
+        print(f"  blas threads limited to {limits} "
+              f"(OMP_NUM_THREADS was {os.environ.get('OMP_NUM_THREADS', 'unset')})")
+    with threadpool_limits(limits=limits):
+      sc.pp.pca(
         adata,
         n_comps=args.n_components,
         zero_center=True,
@@ -134,7 +156,7 @@ def run_pca(adata, args):
         random_state=args.random_seed,
         chunked=chunked,
         chunk_size=args.chunk_size if chunked else None,
-    )
+      )
 
     embedding = np.asarray(adata.obsm["X_pca"], dtype=np.float64)
     loadings = np.asarray(adata.varm["PCs"], dtype=np.float64)
@@ -170,7 +192,11 @@ def main():
     init_logger(str(args.output_dir))
 
     with phase("load") as attrs:
-        adata = load_matrix(args.normalized_selected_h5)
+        if args.solver == "full" and args.dense != "true":
+            raise SystemExit("--solver full is dense-only (sklearn refuses sparse "
+                             "input); pass --dense true rather than let scanpy "
+                             "silently substitute another solver")
+        adata = load_matrix(args.normalized_selected_h5, dense=args.dense == "true")
         attrs["n_cells"] = adata.n_obs
         attrs["n_genes"] = adata.n_vars
     gene_ids = np.array(adata.var_names)
