@@ -105,6 +105,13 @@ def parse_args():
                    help="materialise the matrix dense before PCA")
     # Snakemake exports OMP_NUM_THREADS = <rule threads> (default 1), pinning
     # the BLAS to one thread whichever implementation is linked. 0 = inherit.
+    # Compute precision. The FEAT matrix arrives float64 (R numeric), so this
+    # module computes in float64 today; scanpy's own dtype argument sets the
+    # dtype of the *result*, not of the computation, so it cannot isolate this.
+    # "input" leaves the matrix as read.
+    p.add_argument("--dtype", type=str, default="input",
+                   choices=["input", "float32", "float64"],
+                   help="cast the matrix before PCA (input = leave as read)")
     p.add_argument("--blas_threads", type=int, default=0,
                    help="BLAS threads (0 = inherit OMP_NUM_THREADS)")
     p.add_argument("--n_components", type=int, required=True,
@@ -197,6 +204,9 @@ def main():
                              "input); pass --dense true rather than let scanpy "
                              "silently substitute another solver")
         adata = load_matrix(args.normalized_selected_h5, dense=args.dense == "true")
+        if args.dtype != "input":
+            adata.X = adata.X.astype(args.dtype)
+        print(f"  compute dtype: {adata.X.dtype}")
         attrs["n_cells"] = adata.n_obs
         attrs["n_genes"] = adata.n_vars
     gene_ids = np.array(adata.var_names)
