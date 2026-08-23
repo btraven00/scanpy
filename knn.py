@@ -41,6 +41,12 @@ def parse_args():
     p.add_argument("--flavor", type=str, required=True,
                    choices=["umap", "gauss"], help="Method to compute connectivities")
     p.add_argument("--random_seed", type=int, required=True, help="Random seed")
+    # ponytail: scanpy's default backend is exact (dense pairwise) for euclidean under
+    # 8192 cells, which makes --random_seed inert there. Force an approximate backend
+    # to give the seed something to move.
+    p.add_argument("--transformer", type=str, default="auto",
+                   choices=["auto", "pynndescent", "sklearn"],
+                   help="NN backend ('auto' = scanpy's own choice by size)")
     return p.parse_args()
 
 
@@ -63,6 +69,10 @@ def write_neighbors_graph(adata, out_dir, name):
 
 def main():
     args = parse_args()
+    print(f"Full command: {' '.join(sys.argv)}")
+    for k in ("output_dir", "name", "embedding_tsv", "n_neighbors", "flavor", "random_seed",
+              "transformer"):
+        print(f"  {k}: {getattr(args, k)}")
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -75,7 +85,8 @@ def main():
     adata.obsm["X_pca"] = embedding
 
     sc.pp.neighbors(adata, n_neighbors=args.n_neighbors, method=args.flavor,
-                    use_rep="X_pca", random_state=args.random_seed)
+                    use_rep="X_pca", random_state=args.random_seed,
+                    transformer=None if args.transformer == "auto" else args.transformer)
 
     write_neighbors_graph(adata, args.output_dir, args.name)
 
