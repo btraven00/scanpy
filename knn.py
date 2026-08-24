@@ -41,12 +41,22 @@ def parse_args():
     p.add_argument("--flavor", type=str, required=True,
                    choices=["umap", "gauss"], help="Method to compute connectivities")
     p.add_argument("--random_seed", type=int, required=True, help="Random seed")
-    # ponytail: scanpy's default backend is exact (dense pairwise) for euclidean under
-    # 8192 cells, which makes --random_seed inert there. Force an approximate backend
+    # scanpy's default backend is exact (dense pairwise) for euclidean under
+    # 8192 cells, which makes --random_seed not picked. Force an approximate backend
     # to give the seed something to move.
     p.add_argument("--transformer", type=str, default="auto",
                    choices=["auto", "pynndescent", "sklearn"],
                    help="NN backend ('auto' = scanpy's own choice by size)")
+    # Community detection walks nodes in index order, so the row order of the
+    # embedding changes the clustering it converges to (`random_seed` does
+    # not absorb that, because it fixes a permutation of INDICES, while here
+    # we change which cell each index refers to). Permuting here rather than in the
+    # clustering module means every downstream module sees the identical
+    # permutation, which makes comparisons between clusterers properly paired.
+    # Outputs stay keyed by cell barcode, so nothing downstream needs to know.
+    p.add_argument("--permutation_seed", type=int, default=0,
+                   help="shuffle cell order before building the graph; 0 = identity, "
+                        "(control)")
     return p.parse_args()
 
 
@@ -71,7 +81,7 @@ def main():
     args = parse_args()
     print(f"Full command: {' '.join(sys.argv)}")
     for k in ("output_dir", "name", "embedding_tsv", "n_neighbors", "flavor", "random_seed",
-              "transformer"):
+              "transformer", "permutation_seed"):
         print(f"  {k}: {getattr(args, k)}")
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
@@ -80,8 +90,15 @@ def main():
     df = pl.read_csv(args.embedding_tsv, separator="\t", skip_rows=1, has_header=False)
     embedding = df[:, 1:].to_numpy().astype(np.float64)
 
+    cell_ids = df[:, 0].to_list()
+    if args.permutation_seed:
+        order = np.random.default_rng(args.permutation_seed).permutation(len(cell_ids))
+        embedding = embedding[order]
+        cell_ids = [cell_ids[i] for i in order]
+        print(f"  permuted {len(order)} cells (seed {args.permutation_seed})")
+
     adata = ad.AnnData(X=np.zeros((embedding.shape[0], 1)))
-    adata.obs_names = df[:, 0].to_list()
+    adata.obs_names = cell_ids
     adata.obsm["X_pca"] = embedding
 
     sc.pp.neighbors(adata, n_neighbors=args.n_neighbors, method=args.flavor,
