@@ -4,7 +4,7 @@ PCA module (scanpy-backed) for omnibenchmark.
 
 Output
 ------
-File: {output_dir}/{name}_pcas.tsv
+File: {output_dir}/{name}_embedding.tsv
 
 Tab-separated, with header row:
   cell_id  PC1  PC2  ...  PC{n_components}
@@ -221,7 +221,7 @@ def main():
 
     with phase("write"):
         col_names = [f"PC{i + 1}" for i in range(embedding.shape[1])]
-        embedding_out = Path(args.output_dir) / f"{args.name}_pcas.tsv"
+        embedding_out = Path(args.output_dir) / f"{args.name}_embedding.tsv"
         write_embeddings(Embedding(embedding, list(cell_ids), col_names), embedding_out)
 
         loadings_out = Path(args.output_dir) / f"{args.name}_loadings.tsv"
