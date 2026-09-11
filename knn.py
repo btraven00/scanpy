@@ -31,9 +31,10 @@ def parse_args():
     p = argparse.ArgumentParser(description="kNN graph module (scanpy-backed)")
     cli.add_base_args(p)                # --output_dir, --name
     g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--pcas_tsv", dest="pcas_tsv", type=Path,
-                   help="PCA embedding TSV (cell_ids as rownames)")
-    g.add_argument("--corrected_tsv", dest="pcas_tsv", type=Path,
+    g.add_argument("--embedding_tsv", dest="embedding_tsv", type=Path,
+                   help="Embedding TSV (cell_ids as rownames) from any "
+                        "embedding-producing stage (PCA, ISOMAP, ...)")
+    g.add_argument("--corrected_tsv", dest="embedding_tsv", type=Path,
                    help="Batch-corrected embedding TSV (cell_ids as rownames)")
     p.add_argument("--n_neighbors", type=int, required=True,
                    help="Number of nearest neighbors")
@@ -62,14 +63,11 @@ def write_neighbors_graph(adata, out_dir, name):
 
 def main():
     args = parse_args()
-    print(f"Full command: {' '.join(sys.argv)}")
-    for k in ("output_dir", "name", "pcas_tsv", "n_neighbors", "flavor", "random_seed"):
-        print(f"  {k}: {getattr(args, k)}")
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
 
     # TSV has N header cols and N+1 data cols (first data col = row IDs, unnamed).
-    df = pl.read_csv(args.pcas_tsv, separator="\t", skip_rows=1, has_header=False)
+    df = pl.read_csv(args.embedding_tsv, separator="\t", skip_rows=1, has_header=False)
     embedding = df[:, 1:].to_numpy().astype(np.float64)
 
     adata = ad.AnnData(X=np.zeros((embedding.shape[0], 1)))
