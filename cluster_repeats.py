@@ -65,6 +65,12 @@ def parse_args():
                    help="Resolution controlling cluster granularity")
     p.add_argument("--random_seed", type=int, required=True,
                    help="Base seed; the per-repeat seeds are spawned from it")
+    # Mirror cluster.py's own method params exactly -- this entrypoint is that
+    # clustering repeated, not a second configuration of it.
+    p.add_argument("--flavor", choices=["igraph", "leidenalg"], required=True,
+                   help="Leiden backend flavor")
+    p.add_argument("--partition_type", default="RBConfiguration",
+                   help="Partition type (only used when --flavor leidenalg)")
     p.add_argument("--repeats", type=int, default=1,
                    help="How many seeds to run (default 1: same result as the "
                         "plain cluster entrypoint, just in repeats form)")
@@ -74,7 +80,8 @@ def parse_args():
 def main():
     args = parse_args()
     print(f"Full command: {' '.join(sys.argv)}")
-    for k in ("output_dir", "name", "neighbors_h5", "resolution", "random_seed", "repeats"):
+    for k in ("output_dir", "name", "neighbors_h5", "flavor", "partition_type",
+              "resolution", "random_seed", "repeats"):
         print(f"  {k}: {getattr(args, k)}")
     if args.repeats < 1:
         sys.exit("--repeats must be >= 1")
@@ -87,7 +94,8 @@ def main():
 
     cols = {"cell_id": cell_ids}
     for i, seed in enumerate(spawn_seeds(args.random_seed, args.repeats)):
-        labels = cluster_leiden(adata, args.resolution, seed)
+        labels = cluster_leiden(adata, args.flavor, args.partition_type,
+                                args.resolution, seed)
         cols[f"repeat_{i}"] = labels
         print(f"LOG: repeat {i} seed={seed} k={len(set(labels))}")
 
