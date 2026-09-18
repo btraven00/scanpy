@@ -1,8 +1,0 @@
-{
-  "stage": "CLUSTREP",
-  "version": "0.1.0",
-  "benchmark": "omni-scrna/split-stages-plan",
-  "args": [
-    { "flag": "--neighbors_h5", "type": "path", "help": "Neighbors H5 (kNN distances + connectivities)" }
-  ]
-}
