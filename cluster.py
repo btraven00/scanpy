@@ -30,6 +30,8 @@ import scanpy as sc
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 from common import cli  # noqa: E402
+from obkit.logger import init_logger  # noqa: E402
+from phases import phase  # noqa: E402
 from readers import read_neighbors  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -106,15 +108,26 @@ def main():
         print(f"  {k}: {getattr(args, k)}")
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    init_logger(str(args.output_dir))
 
-    adata, cell_ids = build_adata(args.neighbors_h5)
-    labels = cluster_leiden(
-        adata, args.flavor, args.partition_type, args.resolution, args.random_seed
-    )
+    with phase("load") as attrs:
+        adata, cell_ids = build_adata(args.neighbors_h5)
+        attrs["n_cells"] = len(cell_ids)
+        attrs["nnz"] = int(adata.obsp["connectivities"].nnz)
 
-    out = Path(args.output_dir) / f"{args.name}_clusters.tsv"
-    pl.DataFrame({"cell_id": cell_ids, "cluster": labels}).write_csv(out, separator="\t")
-    print(f"  wrote: {out}")
+    with phase("compute") as attrs:
+        labels = cluster_leiden(
+            adata, args.flavor, args.partition_type, args.resolution, args.random_seed
+        )
+        attrs["k_found"] = len(set(labels))
+        attrs["resolution"] = args.resolution
+        attrs["flavor"] = args.flavor
+
+    with phase("write") as attrs:
+        out = Path(args.output_dir) / f"{args.name}_clusters.tsv"
+        pl.DataFrame({"cell_id": cell_ids, "cluster": labels}).write_csv(out, separator="\t")
+        attrs["path"] = str(out)
+        print(f"  wrote: {out}")
 
 
 if __name__ == "__main__":
