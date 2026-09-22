@@ -2,11 +2,11 @@
 
 entrypoints:
   pca: pca.py
-  pca-prof: denet pca.py
+  pca-prof: prof.sh pca.py
   knn: knn.py
-  knn-prof: denet knn.py
+  knn-prof: prof.sh knn.py
   cluster: cluster.py
-  cluster-prof: denet cluster.py
+  cluster-prof: prof.sh cluster.py
   normalize: normalize.py
   feat-select: feat-select.py
 
