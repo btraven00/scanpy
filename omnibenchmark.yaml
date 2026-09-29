@@ -9,6 +9,8 @@ entrypoints:
   cluster-prof: prof.sh cluster.py
   normalize: normalize.py
   feat-select: feat-select.py
+  ndimr: ndimr.py
+  rdimr: rdimr.py
 
 # common code
 # `pixi run -e dev sync` (from this module root) refreshes it.

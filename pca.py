@@ -88,13 +88,22 @@ from phases import phase  # noqa: E402
 from obkit.logger import init_logger  # noqa: E402
 
 
-def parse_args():
+# The one input path each stage's schema declares. PCA gets the FEAT-selected
+# matrix, NDIMR (ndimr.py) the same TENx layout over all genes.
+INPUT = {"PCA": "normalized_selected_h5", "NDIMR": "normalized_h5"}
+
+
+def parse_args(stage="PCA"):
     # We own the parser; src/common/cli injects the shared contract (base args + the
-    # `PCA` stage I/O from common/schema). This module's method params are
+    # stage I/O from common/schema). This module's method params are
     # hand-rolled below, so the whole CLI stays visible here.
-    p = argparse.ArgumentParser(description="PCA module (scanpy-backed)")
+    p = argparse.ArgumentParser(description=f"{stage} module (scanpy-backed)")
     cli.add_base_args(p)             # --output_dir, --name
-    cli.add_stage_args(p, "PCA")     # --normalized_selected_h5
+    cli.add_stage_args(p, stage)     # --normalized_selected_h5 | --normalized_h5
+    if stage == "NDIMR":
+        # ponytail: NDIMR only, so the PCA arms' CLI and outputs stay as they were.
+        p.add_argument("--scale", type=str, default="false", choices=["true", "false"],
+                       help="z-score each gene before PCA (sc.pp.scale, no clipping)")
     p.add_argument("--solver", type=str, required=True,
                    choices=["arpack", "randomized", "full"], help="PCA solver")
     # Dense vs sparse is its own axis, not a side effect of the solver: the
@@ -143,6 +152,12 @@ def load_matrix(h5_path, dense=False):
     return adata
 
 
+def scale(adata):
+    """Per-gene z-score: zero_center, and no max_value clip, so every
+    non-constant gene has unit variance (ddof=1). Densifies sparse input."""
+    sc.pp.scale(adata, zero_center=True, max_value=None)
+
+
 def run_pca(adata, args):
     # Chunked mode triggers IncrementalPCA. It is most effective with backed
     # AnnData; for in-memory data it provides no memory benefit and is slower.
@@ -189,10 +204,21 @@ def validate_args(args):
 
 
 
-def main():
-    args = parse_args()
+def write_outputs(args, embedding, loadings, cell_ids, gene_ids):
+    col_names = [f"PC{i + 1}" for i in range(embedding.shape[1])]
+    embedding_out = Path(args.output_dir) / f"{args.name}_embedding.tsv"
+    write_embeddings(Embedding(embedding, list(cell_ids), col_names), embedding_out)
+
+    loadings_out = Path(args.output_dir) / f"{args.name}_loadings.tsv"
+    write_loadings(Loadings(loadings, list(gene_ids), col_names), loadings_out)
+    print(f"  wrote: {embedding_out}")
+    print(f"  wrote: {loadings_out}")
+
+
+def main(stage="PCA"):
+    args = parse_args(stage)
     print(f"Full command: {' '.join(sys.argv)}")
-    for k in ("output_dir", "name", "normalized_selected_h5", "solver", "n_components", "random_seed"):
+    for k in ("output_dir", "name", INPUT[stage], "solver", "n_components", "random_seed"):
         print(f"  {k}: {getattr(args, k)}")
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
@@ -203,7 +229,7 @@ def main():
             raise SystemExit("--solver full is dense-only (sklearn refuses sparse "
                              "input); pass --dense true rather than let scanpy "
                              "silently substitute another solver")
-        adata = load_matrix(args.normalized_selected_h5, dense=args.dense == "true")
+        adata = load_matrix(getattr(args, INPUT[stage]), dense=args.dense == "true")
         if args.dtype != "input":
             adata.X = adata.X.astype(args.dtype)
         print(f"  compute dtype: {adata.X.dtype}")
@@ -213,21 +239,20 @@ def main():
     cell_ids = np.array(adata.obs_names)
     print(f"  matrix (cells x genes): {adata.shape}")
 
+    if getattr(args, "scale", "false") == "true":
+        with phase("scale"):
+            scale(adata)
+
     with phase("pca") as attrs:
         embedding, loadings, variance, variance_ratio = run_pca(adata, args)
         attrs["solver"] = args.solver or "chunked"
         attrs["n_components"] = args.n_components
+        if stage == "NDIMR":
+            attrs["scale"] = args.scale == "true"
     print(f"  embedding: {embedding.shape}, loadings: {loadings.shape}")
 
     with phase("write"):
-        col_names = [f"PC{i + 1}" for i in range(embedding.shape[1])]
-        embedding_out = Path(args.output_dir) / f"{args.name}_embedding.tsv"
-        write_embeddings(Embedding(embedding, list(cell_ids), col_names), embedding_out)
-
-        loadings_out = Path(args.output_dir) / f"{args.name}_loadings.tsv"
-        write_loadings(Loadings(loadings, list(gene_ids), col_names), loadings_out)
-    print(f"  wrote: {embedding_out}")
-    print(f"  wrote: {loadings_out}")
+        write_outputs(args, embedding, loadings, cell_ids, gene_ids)
 
 
 if __name__ == "__main__":
