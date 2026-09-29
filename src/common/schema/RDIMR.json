@@ -1,0 +1,10 @@
+{
+  "stage": "RDIMR",
+  "version": "0.1.0",
+  "benchmark": "omni-scrna/split-stages-plan",
+  "args": [
+    { "flag": "--rawdata_h5ad", "type": "path", "help": "rawdata H5AD file (counts in layers['counts'])" },
+    { "flag": "--filtered_cellids", "type": "path", "help": "gzipped list of kept cell ids" },
+    { "flag": "--filtered_featureids", "type": "path", "help": "gzipped list of kept feature ids" }
+  ]
+}

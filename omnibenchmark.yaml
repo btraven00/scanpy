@@ -20,6 +20,6 @@ templates:
 # benchmark(s) this module works with
 benchmarks:
   - name: split-stages
-    repo: https://github.com/omni-scrna/split-stages-plan
+    repo: https://github.com/btraven00/omni-scrna-plan  # embed-gen: NDIMR + RDIMR schemas, not upstream yet
     plan: benchmark_conda.yaml
     ref: embed-gen

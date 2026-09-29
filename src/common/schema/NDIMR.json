@@ -1,0 +1,8 @@
+{
+  "stage": "NDIMR",
+  "version": "0.1.0",
+  "benchmark": "omni-scrna/split-stages-plan",
+  "args": [
+    { "flag": "--normalized_h5", "type": "path", "help": "Normalized matrix H5 (all genes, no feature selection)" }
+  ]
+}
