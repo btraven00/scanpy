@@ -16,7 +16,8 @@ Implementation notes
 - Genes are mean-centered (only) before PCA via sc.pp.pca(zero_center=True).
   No per-gene variance scaling — matches scrapper/rapids-singlecell. If
   alternative scaling is needed later, expose it as a new --pca_type variant
-  rather than as an independent flag.
+  rather than as an independent flag. NDIMR (ndimr.py) does: --pca_type
+  standardized z-scores each gene first.
 
 --solver randomized IS SILENTLY IGNORED (measured 2026-08-15)
 ------------------------------------------------------------
@@ -102,8 +103,10 @@ def parse_args(stage="PCA"):
     cli.add_stage_args(p, stage)     # --normalized_selected_h5 | --normalized_h5
     if stage == "NDIMR":
         # ponytail: NDIMR only, so the PCA arms' CLI and outputs stay as they were.
-        p.add_argument("--scale", type=str, default="false", choices=["true", "false"],
-                       help="z-score each gene before PCA (sc.pp.scale, no clipping)")
+        p.add_argument("--pca_type", type=str, default="centered",
+                       choices=["centered", "standardized"],
+                       help="centered: mean-centre only, as the PCA arms; standardized: "
+                            "z-score each gene first (sc.pp.scale, no clipping)")
     p.add_argument("--solver", type=str, required=True,
                    choices=["arpack", "randomized", "full"], help="PCA solver")
     # Dense vs sparse is its own axis, not a side effect of the solver: the
@@ -239,7 +242,7 @@ def main(stage="PCA"):
     cell_ids = np.array(adata.obs_names)
     print(f"  matrix (cells x genes): {adata.shape}")
 
-    if getattr(args, "scale", "false") == "true":
+    if getattr(args, "pca_type", "centered") == "standardized":
         with phase("scale"):
             scale(adata)
 
@@ -248,7 +251,7 @@ def main(stage="PCA"):
         attrs["solver"] = args.solver or "chunked"
         attrs["n_components"] = args.n_components
         if stage == "NDIMR":
-            attrs["scale"] = args.scale == "true"
+            attrs["pca_type"] = args.pca_type
     print(f"  embedding: {embedding.shape}, loadings: {loadings.shape}")
 
     with phase("write"):
