@@ -28,10 +28,14 @@ def neighbors_h5(tmp_path):
     return tmp_path / "t_neighbors.h5", ids
 
 
-def test_cluster_leiden_separates_blocks(neighbors_h5):
+BACKENDS = [("igraph", None), ("leidenalg", "RBConfiguration")]
+
+
+@pytest.mark.parametrize("flavor,partition_type", BACKENDS)
+def test_cluster_leiden_separates_blocks(neighbors_h5, flavor, partition_type):
     path, ids = neighbors_h5
     adata, _ = build_adata(path)
-    labels = cluster_leiden(adata, resolution=1.0, random_seed=0)
+    labels = cluster_leiden(adata, flavor, partition_type, resolution=1.0, random_seed=0)
 
     assert len(labels) == len(ids)
     n = len(ids) // 2
@@ -39,8 +43,10 @@ def test_cluster_leiden_separates_blocks(neighbors_h5):
     assert set(labels[:n]) != set(labels[n:])
 
 
-def test_cluster_leiden_deterministic(neighbors_h5):
+@pytest.mark.parametrize("flavor,partition_type", BACKENDS)
+def test_cluster_leiden_deterministic(neighbors_h5, flavor, partition_type):
     path, _ = neighbors_h5
     a1, _ = build_adata(path)
     a2, _ = build_adata(path)
-    assert cluster_leiden(a1, 1.0, 42) == cluster_leiden(a2, 1.0, 42)
+    assert (cluster_leiden(a1, flavor, partition_type, 1.0, 42)
+            == cluster_leiden(a2, flavor, partition_type, 1.0, 42))
