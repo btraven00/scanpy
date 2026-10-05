@@ -23,12 +23,12 @@ ROOT = Path(__file__).resolve().parent.parent
 # order-stable than it is, which is exactly the property under test here.
 
 
-def run(tmp, pcas, perm, name="t"):
+def run(tmp, pcas, perm, name="t", transformer="pynndescent"):
     out = tmp / f"perm{perm}"
     subprocess.run(
         [sys.executable, str(ROOT / "knn.py"), "--output_dir", str(out), "--name", name,
          "--embedding_tsv", str(pcas), "--n_neighbors", "5", "--flavor", "umap",
-         "--random_seed", "42", "--transformer", "pynndescent",
+         "--random_seed", "42", "--transformer", transformer,
          "--permutation_seed", str(perm)],
         check=True, capture_output=True,
     )
@@ -125,3 +125,26 @@ def test_degrees_stay_uniform(tmp_path, be1_pcas_tsv):
     for seed in (0, 3):
         _, _, _, indptr = read(run(tmp_path / f"s{seed}", be1_pcas_tsv, seed))
         assert len(set(np.diff(indptr).tolist())) == 1
+
+
+def _by_barcode(p, group=""):
+    """Graph as {(barcode, barcode): weight}, comparable across permutations."""
+    with h5py.File(p, "r") as h5:
+        ids = [s.decode() for s in h5["cell_ids"][:]]
+        g = h5[group] if group else h5
+        data, indices, indptr = g["data"][:], g["indices"][:], g["indptr"][:]
+    return {(ids[r], ids[c]): w for r in range(len(ids))
+            for c, w in zip(indices[indptr[r]:indptr[r + 1]], data[indptr[r]:indptr[r + 1]])}
+
+
+def test_exact_backend_graph_is_order_invariant(tmp_path, be1_pcas_tsv):
+    """With an exact search, permuting cells must leave the graph unchanged by
+    barcode -- so in an exact arm, permutation_seed perturbs only the order the
+    clusterer walks, not the graph. Weights are compared exactly: a float-level
+    drift here would be a graph perturbation too."""
+    base = run(tmp_path / "a", be1_pcas_tsv, 0, transformer="sklearn")
+    for seed in (3, 11):
+        perm = run(tmp_path / f"s{seed}", be1_pcas_tsv, seed, transformer="sklearn")
+        for group in ("", "connectivities"):
+            assert _by_barcode(perm, group) == _by_barcode(base, group), \
+                f"exact graph ({group or 'distances'}) changed under permutation {seed}"
