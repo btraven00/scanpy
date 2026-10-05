@@ -22,6 +22,7 @@ import anndata as ad
 import h5py
 import numpy as np
 import polars as pl
+import numba
 import scanpy as sc
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))  # vendored `common` package (src/common)
@@ -57,10 +58,12 @@ def parse_args():
     p.add_argument("--permutation_seed", type=int, default=0,
                    help="shuffle cell order before building the graph; 0 = identity, "
                         "(control)")
-    # pynndescent threads (it calls numba.set_num_threads(n_jobs) itself). The
-    # thread count changes the graph at a fixed random_state (tm-facs: Jaccard
-    # 0.9966 at 8 vs 1, ~40% of a seed change) while barely saving time (numba
-    # JIT dominates), so keep the default unless thread count is the factor.
+    # pynndescent threads. The thread count changes the graph at a fixed
+    # random_state, and the partition as much as a kNN-seed change (tm-facs), while
+    # barely saving time (numba JIT dominates): keep 1 unless threads are the factor.
+    # scanpy forwards settings.n_jobs only on transformer=auto; with an explicit
+    # "pynndescent" it passes none and numba takes every core of the machine, so
+    # we also pin numba itself.
     p.add_argument("--n_jobs", type=int, default=1,
                    help="pynndescent threads; changes the graph, not just speed")
     return p.parse_args()
@@ -108,6 +111,7 @@ def main():
     adata.obsm["X_pca"] = embedding
 
     sc.settings.n_jobs = args.n_jobs
+    numba.set_num_threads(args.n_jobs)
     sc.pp.neighbors(adata, n_neighbors=args.n_neighbors, method=args.flavor,
                     use_rep="X_pca", random_state=args.random_seed,
                     transformer=None if args.transformer == "auto" else args.transformer)
