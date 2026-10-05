@@ -23,13 +23,13 @@ ROOT = Path(__file__).resolve().parent.parent
 # order-stable than it is, which is exactly the property under test here.
 
 
-def run(tmp, pcas, perm, name="t", transformer="pynndescent"):
+def run(tmp, pcas, perm, name="t", transformer="pynndescent", extra=()):
     out = tmp / f"perm{perm}"
     subprocess.run(
         [sys.executable, str(ROOT / "knn.py"), "--output_dir", str(out), "--name", name,
          "--embedding_tsv", str(pcas), "--n_neighbors", "5", "--flavor", "umap",
          "--random_seed", "42", "--transformer", transformer,
-         "--permutation_seed", str(perm)],
+         "--permutation_seed", str(perm), *extra],
         check=True, capture_output=True,
     )
     return out / f"{name}_neighbors.h5"
@@ -148,3 +148,12 @@ def test_exact_backend_graph_is_order_invariant(tmp_path, be1_pcas_tsv):
         for group in ("", "connectivities"):
             assert _by_barcode(perm, group) == _by_barcode(base, group), \
                 f"exact graph ({group or 'distances'}) changed under permutation {seed}"
+
+
+def test_n_jobs_default_is_single_threaded(tmp_path, be1_pcas_tsv):
+    """--n_jobs defaults to 1: omitting it must give the same bytes as asking for
+    1, so existing runs keep their graph. A multithreaded run must still work."""
+    sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+    default = sha(run(tmp_path / "d", be1_pcas_tsv, 3))
+    assert sha(run(tmp_path / "one", be1_pcas_tsv, 3, extra=("--n_jobs", "1"))) == default
+    assert run(tmp_path / "four", be1_pcas_tsv, 3, extra=("--n_jobs", "4")).exists()

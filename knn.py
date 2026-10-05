@@ -57,6 +57,12 @@ def parse_args():
     p.add_argument("--permutation_seed", type=int, default=0,
                    help="shuffle cell order before building the graph; 0 = identity, "
                         "(control)")
+    # pynndescent threads (it calls numba.set_num_threads(n_jobs) itself). The
+    # thread count changes the graph at a fixed random_state (tm-facs: Jaccard
+    # 0.9966 at 8 vs 1, ~40% of a seed change) while barely saving time (numba
+    # JIT dominates), so keep the default unless thread count is the factor.
+    p.add_argument("--n_jobs", type=int, default=1,
+                   help="pynndescent threads; changes the graph, not just speed")
     return p.parse_args()
 
 
@@ -81,7 +87,7 @@ def main():
     args = parse_args()
     print(f"Full command: {' '.join(sys.argv)}")
     for k in ("output_dir", "name", "embedding_tsv", "n_neighbors", "flavor", "random_seed",
-              "transformer", "permutation_seed"):
+              "transformer", "permutation_seed", "n_jobs"):
         print(f"  {k}: {getattr(args, k)}")
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
@@ -101,6 +107,7 @@ def main():
     adata.obs_names = cell_ids
     adata.obsm["X_pca"] = embedding
 
+    sc.settings.n_jobs = args.n_jobs
     sc.pp.neighbors(adata, n_neighbors=args.n_neighbors, method=args.flavor,
                     use_rep="X_pca", random_state=args.random_seed,
                     transformer=None if args.transformer == "auto" else args.transformer)
