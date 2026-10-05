@@ -118,6 +118,13 @@ def parse_args():
                    help="Number of principal components to compute")
     p.add_argument("--random_seed", type=int, required=True,
                    help="Seed for randomized solvers (and for reproducibility)")
+    # Randomized solver (dense) only. Defaults are sklearn's, i.e. exactly what
+    # sc.pp.pca runs today (iterated_power="auto" -> 7 power iterations at this
+    # shape, n_oversamples=10); rapids' halko module uses the same defaults.
+    p.add_argument("--n_iter", type=str, default="auto",
+                   help="power iterations for --solver randomized ('auto' = sklearn's choice, 7 here)")
+    p.add_argument("--n_oversamples", type=int, default=10,
+                   help="oversamples for --solver randomized (sklearn default 10)")
     return p.parse_args()
 
 
@@ -154,6 +161,21 @@ def run_pca(adata, args):
     if limits:
         print(f"  blas threads limited to {limits} "
               f"(OMP_NUM_THREADS was {os.environ.get('OMP_NUM_THREADS', 'unset')})")
+    tuned = args.n_iter != "auto" or args.n_oversamples != 10
+    if tuned:
+        # sc.pp.pca exposes neither knob; for dense randomized input it runs exactly
+        # sklearn's PCA(svd_solver="randomized"), so call that with them set.
+        from sklearn.decomposition import PCA
+        X = np.asarray(adata.X)
+        with threadpool_limits(limits=limits):
+            pca = PCA(n_components=args.n_components, svd_solver="randomized", random_state=args.random_seed,
+                      iterated_power=int(args.n_iter) if args.n_iter != "auto" else "auto",
+                      n_oversamples=args.n_oversamples)
+            emb = pca.fit_transform(X)
+        # float32 first: sc.pp.pca stores X_pca as float32 by default, so both paths agree.
+        return (np.asarray(emb.astype(np.float32), dtype=np.float64), np.asarray(pca.components_.T, dtype=np.float64),
+                np.asarray(pca.explained_variance_, dtype=np.float64),
+                np.asarray(pca.explained_variance_ratio_, dtype=np.float64))
     with threadpool_limits(limits=limits):
       sc.pp.pca(
         adata,
@@ -191,6 +213,9 @@ def validate_args(args):
 
 def main():
     args = parse_args()
+    if (args.n_iter != "auto" or args.n_oversamples != 10) and not (
+            args.solver == "randomized" and args.dense == "true"):
+        sys.exit("error: --n_iter / --n_oversamples only apply to --solver randomized with --dense true")
     print(f"Full command: {' '.join(sys.argv)}")
     for k in ("output_dir", "name", "normalized_selected_h5", "solver", "n_components", "random_seed"):
         print(f"  {k}: {getattr(args, k)}")
