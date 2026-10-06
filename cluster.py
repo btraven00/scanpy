@@ -60,6 +60,9 @@ def parse_args():
     # per resolution) and {name}_sweep.json instead of {name}_clusters.tsv.
     p.add_argument("--sweep", type=str, default=None,
                    help="MIN:MAX:STEP resolution grid (inclusive); replaces --resolution")
+    # Resolution chosen upstream (e.g. pick-scshc scoring a CLUST-SWEEP): {"resolution": r, ...}
+    p.add_argument("--pick_json", type=Path, default=None,
+                   help="JSON with the resolution to use; replaces --resolution")
     p.add_argument("--random_seed", type=int, required=True, help="Random seed")
     p.add_argument("--flavor", choices=["igraph", "leidenalg"], required=True,
                    help="Leiden backend flavor")
@@ -74,8 +77,11 @@ def parse_args():
                    default="RBConfiguration",
                    help="Partition type (only used when --flavor leidenalg)")
     a = p.parse_args()
-    if (a.resolution is None) == (a.sweep is None):
-        p.error("give exactly one of --resolution or --sweep")
+    if sum(x is not None for x in (a.resolution, a.sweep, a.pick_json)) != 1:
+        p.error("give exactly one of --resolution, --sweep or --pick_json")
+    if a.pick_json is not None:
+        import json
+        a.resolution = float(json.loads(a.pick_json.read_text())["resolution"])
     return a
 
 
@@ -128,7 +134,7 @@ def main():
     args = parse_args()
     print(f"Full command: {' '.join(sys.argv)}")
     for k in ("output_dir", "name", "neighbors_h5", "flavor", "partition_type",
-              "resolution", "sweep", "random_seed", "n_iterations"):
+              "resolution", "sweep", "pick_json", "random_seed", "n_iterations"):
         print(f"  {k}: {getattr(args, k)}")
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
