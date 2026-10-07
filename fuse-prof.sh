@@ -8,13 +8,13 @@ out=""
 for ((i = 1; i < $#; i++)); do [[ ${!i} == --output_dir ]] && { j=$((i + 1)); out=${!j}; }; done
 [[ -n $out ]] || { echo "error: --output_dir is required" >&2; exit 2; }
 mkdir -p "$out"
-# Thread limit, N = --blas_threads (0 or missing = every core we are allowed).
+# Thread limit, N = --threads (0 or missing = every core we are allowed).
 # Hard: pin the whole tree (denet included, so its env record shows the pin) to N
 # of the inherited cores. Soft: size every pool to N, so they don't oversubscribe
 # the pinned cores (OpenBLAS, OpenMP/sklearn, MKL, numba, polars/rayon, numexpr;
 # vecLib on macOS). macOS has no affinity, so only the pool sizes apply there.
 n=0
-for ((i = 1; i < $#; i++)); do [[ ${!i} == --blas_threads ]] && { j=$((i + 1)); n=${!j}; }; done
+for ((i = 1; i < $#; i++)); do [[ ${!i} == --threads ]] && { j=$((i + 1)); n=${!j}; }; done
 pin=()
 if [[ $(uname) == Linux ]]; then
   # one hardware thread per physical core, from the cores we may use (Slurm/cgroup already narrowed these)

@@ -109,7 +109,7 @@ def freeze(x):
 
 def _step_params(stage):
     args = dict(zip((k[2:] for k in P[::2]), P[1::2]))
-    return {k: t(args[k]) if k in args else 0 for k, t in STEPS[stage].params.items()}
+    return {k: t(args[k]) for k, t in STEPS[stage].params.items()}
 
 
 def _chain(adata, guard):

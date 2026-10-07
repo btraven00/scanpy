@@ -32,6 +32,8 @@ def parse_args(argv=None):
     cli.add_base_args(p)
     p.add_argument("--steps", required=True)
     p.add_argument("--replicate", type=int, default=0)  # unused; separates same-seed replicate dirs
+    # Run-wide, not a step parameter: fuse-prof.sh pins N cores and sizes every pool to N.
+    p.add_argument("--threads", type=int, default=0)
     for k in external:
         p.add_argument(f"--{k}", type=Path, required=True)
     seen = {}
@@ -39,7 +41,7 @@ def parse_args(argv=None):
         for k, t in st.params.items():
             assert seen.setdefault(k, t) is t, f"param {k} has two types"
     for k, t in seen.items():
-        p.add_argument(f"--{k}", type=t, required=k != "blas_threads", default=0 if k == "blas_threads" else None)
+        p.add_argument(f"--{k}", type=t, required=True)
     return p.parse_args(argv), stages, external
 
 

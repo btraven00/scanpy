@@ -120,7 +120,6 @@ class PCAOut(TypedDict):
 class PCAParams(TypedDict):
     solver: str
     n_components: int
-    blas_threads: int
     random_seed: int
 
 def pca_step(ins: PCAIn, p: PCAParams) -> PCAOut:
@@ -129,7 +128,8 @@ def pca_step(ins: PCAIn, p: PCAParams) -> PCAOut:
     # Fresh AnnData that shares X: sc.pp.pca writes obsm/varm/uns into the object
     # it gets, and the caller's input must not change. X is not copied.
     adata = ad.AnnData(X=src.X, obs=src.obs[[]], var=src.var[[]])
-    emb, *_ = run_pca(adata, SimpleNamespace(**p))
+    # blas_threads=0: inherit the run-wide limit that fuse-prof.sh sets (--threads)
+    emb, *_ = run_pca(adata, SimpleNamespace(**p, blas_threads=0))
     return {"embedding_tsv": Embedding(emb, list(adata.obs_names), [f"PC{i + 1}" for i in range(emb.shape[1])])}
 
 
