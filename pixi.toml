@@ -1,5 +1,6 @@
 [workspace]
 authors = ["ben <ben.uzh@proton.me>"]
+# almost-conductor only for denet on osx-arm64: conda-forge builds it for linux-64 and osx-64 only (2026-10-07)
 channels = ["conda-forge", "bioconda", "https://prefix.dev/almost-conductor"]
 name = "scanpy"
 platforms = ["linux-64", "osx-arm64"]
