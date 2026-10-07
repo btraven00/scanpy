@@ -21,8 +21,8 @@ numpy = ">=2.4.3,<3"
 polars = ">=1,<2"
 python-igraph = ">=0.11,<1"   # Leiden backend (cluster.py)
 leidenalg = ">=0.10,<1"
-scikit-learn = ">=1.5,<2"   # exact kNN reference (pipeline.py --knn_transformer sklearn)
-denet = ">=0.10.3"          # pipeline-prof entrypoint; obkit phases land in its trace
+scikit-learn = ">=1.5,<2"   # exact kNN reference (steps.py NNG, --knn_transformer sklearn)
+denet = ">=0.10.3"          # fuse-prof entrypoint; obkit phases land in its trace
 
 # env for quick dev tasks - avoid the regular deps
 [feature.dev.dependencies]
