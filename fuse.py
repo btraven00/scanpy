@@ -11,6 +11,7 @@ gets an obkit phase named after its stage.
 """
 
 import argparse
+import dataclasses
 import sys
 from pathlib import Path
 
@@ -19,6 +20,21 @@ from common import cli  # noqa: E402
 from phases import phase  # noqa: E402
 from obkit.logger import init_logger  # noqa: E402
 from steps import STEPS, plan  # noqa: E402
+
+import anndata as ad  # noqa: E402
+
+
+def _head(v, n):
+    """The first n cells of a loaded input, for the warm-up run."""
+    if isinstance(v, ad.AnnData):
+        return v[:n].copy()
+    def cut(x):
+        if isinstance(x, list):
+            return x[:n]
+        if hasattr(x, "shape") and len(x.shape) == 2 and x.shape[0] == x.shape[1]:
+            return x[:n, :n]  # cell x cell graph
+        return x[:n] if hasattr(x, "shape") else x
+    return dataclasses.replace(v, **{f.name: cut(getattr(v, f.name)) for f in dataclasses.fields(v)})
 
 
 def parse_args(argv=None):
@@ -34,6 +50,10 @@ def parse_args(argv=None):
     p.add_argument("--replicate", type=int, default=0)  # unused; separates same-seed replicate dirs
     # Run-wide, not a step parameter: fuse-prof.sh pins N cores and sizes every pool to N.
     p.add_argument("--threads", type=int, default=0)
+    # Run-wide: run the chain once on the first N cells under warmup:* phases and discard
+    # it, so JIT/kernel compilation and device init land there, not in the timed phases.
+    # N must be large enough to take the same code paths (scanpy kNN: >= 4096 cells).
+    p.add_argument("--warmup_cells", type=int, default=0)
     for k in external:
         p.add_argument(f"--{k}", type=Path, required=True)
     # step parameters are namespaced by stage: --pca_dtype, --nng_n_neighbors, --clust_random_seed
@@ -41,6 +61,16 @@ def parse_args(argv=None):
         for k, t in st.params.items():
             p.add_argument(f"--{st.stage.lower()}_{k}", type=t, required=True)
     return p.parse_args(argv), stages, external
+
+
+def _chain(env, stages, a, prefix=""):
+    produced = []
+    for st in (STEPS[s] for s in stages):
+        with phase(prefix + st.stage.lower()):
+            res = st.run({k: env[k] for k in st.inputs}, {k: a[f"{st.stage.lower()}_{k}"] for k in st.params})
+        env.update(res)
+        produced += [(k, st.outputs[k]) for k in res]
+    return produced
 
 
 def main(argv=None):
@@ -52,12 +82,9 @@ def main(argv=None):
 
     with phase("load"):
         env = {k: t.load(a[k]) for k, t in external.items()}
-    saves = []
-    for st in (STEPS[s] for s in stages):
-        with phase(st.stage.lower()):
-            res = st.run({k: env[k] for k in st.inputs}, {k: a[f"{st.stage.lower()}_{k}"] for k in st.params})
-        env.update(res)
-        saves += [(k, st.outputs[k]) for k in res]
+    if args.warmup_cells:
+        _chain({k: _head(v, args.warmup_cells) for k, v in env.items()}, stages, a, "warmup:")
+    saves = _chain(env, stages, a)
     with phase("write"):
         for k, t in saves:
             t.save(env[k], out / f"{args.name}{t.suffix}")

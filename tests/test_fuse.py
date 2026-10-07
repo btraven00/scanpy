@@ -137,3 +137,15 @@ def test_guards_fire(tmp_path):
         open(tmp_path / "side.txt").read()
     with pytest.raises(ValueError, match="read-only"):
         freeze(np.zeros(3))[0] = 1
+
+
+def test_warmup_is_invisible_in_outputs(tmp_path, h5ad):
+    import json
+    w, c = tmp_path / "warm", tmp_path / "cold"
+    fuse.main(["--output_dir", str(c), "--name", "x", "--steps", "PCA,NNG,CLUST", "--data_h5ad", str(h5ad)] + P)
+    fuse.main(["--output_dir", str(w), "--name", "x", "--steps", "PCA,NNG,CLUST", "--data_h5ad", str(h5ad),
+               "--warmup_cells", "100"] + P)
+    ev = [json.loads(l)["event"] for l in open(w / "obkit-events.jsonl") if '"end"' in l]
+    assert ev == ["load", "warmup:pca", "warmup:nng", "warmup:clust", "pca", "nng", "clust", "write"]
+    for name in ("x_embedding.tsv", "x_clusters.tsv"):
+        assert (w / name).read_bytes() == (c / name).read_bytes(), name
