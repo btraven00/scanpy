@@ -3,6 +3,7 @@ name: scanpy
 channels:
 - conda-forge
 - bioconda
+- https://prefix.dev/almost-conductor
 - nodefaults
 dependencies:
 - python >=3.14.4,<3.15
@@ -14,6 +15,8 @@ dependencies:
 - polars >=1,<2
 - python-igraph >=0.11,<1
 - leidenalg >=0.10,<1
+- scikit-learn >=1.5,<2
+- denet >=0.10.3
 - pip
 - pip:
   - obkit>=0.0.3, <0.0.4

@@ -1,6 +1,6 @@
 [workspace]
 authors = ["ben <ben.uzh@proton.me>"]
-channels = ["conda-forge", "bioconda"]
+channels = ["conda-forge", "bioconda", "https://prefix.dev/almost-conductor"]
 name = "scanpy"
 platforms = ["linux-64", "osx-arm64"]
 version = "0.1.0"
@@ -20,6 +20,8 @@ numpy = ">=2.4.3,<3"
 polars = ">=1,<2"
 python-igraph = ">=0.11,<1"   # Leiden backend (cluster.py)
 leidenalg = ">=0.10,<1"
+scikit-learn = ">=1.5,<2"   # exact kNN reference (pipeline.py --knn_transformer sklearn)
+denet = ">=0.10.3"          # pipeline-prof entrypoint; obkit phases land in its trace
 
 # env for quick dev tasks - avoid the regular deps
 [feature.dev.dependencies]

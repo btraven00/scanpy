@@ -7,6 +7,8 @@ entrypoints:
   cluster: cluster.py
   normalize: normalize.py
   feat-select: feat-select.py
+  pipeline: pipeline.py
+  pipeline-prof: pipeline-prof.sh
 
 # common code
 # `pixi run -e dev sync` (from this module root) refreshes it.

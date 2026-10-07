@@ -16,6 +16,7 @@ environments:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
     - url: https://conda.anaconda.org/bioconda/
+    - url: https://prefix.dev/almost-conductor/
     indexes:
     - https://pypi.org/simple
     packages:
@@ -36,6 +37,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-hda65f42_9.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/c-ares-1.34.6-hb03c661_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/contourpy-1.3.3-py314h97ea11e_4.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/denet-0.10.3-hf19af3b_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/freetype-2.14.3-ha770c72_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/glpk-5.0-h445213a_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/gmp-6.3.0-hac33072_2.conda
@@ -334,11 +336,13 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/yaml-0.2.5-h74c22ad_3.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zlib-ng-2.3.3-h31dac16_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hf451053_7.conda
+      - conda: https://prefix.dev/almost-conductor/osx-arm64/denet-0.10.3-h60d57d3_0.conda
       - pypi: https://files.pythonhosted.org/packages/5c/f3/0aeab8eab2fd7776759367cfaf6cdda582cc6ba950d103ee65a3dab0aee8/obkit-0.0.3-py3-none-any.whl
   dev:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
     - url: https://conda.anaconda.org/bioconda/
+    - url: https://prefix.dev/almost-conductor/
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
@@ -410,6 +414,7 @@ environments:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
     - url: https://conda.anaconda.org/bioconda/
+    - url: https://prefix.dev/almost-conductor/
     indexes:
     - https://pypi.org/simple
     packages:
@@ -431,6 +436,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/c-ares-1.34.6-hb03c661_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/cairo-1.18.4-he90730b_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/contourpy-1.3.3-py314h97ea11e_4.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/denet-0.10.3-hf19af3b_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/fontconfig-2.18.1-h27c8c51_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/freetype-2.14.3-ha770c72_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/fribidi-1.0.16-hb03c661_0.conda
@@ -763,6 +769,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/yaml-0.2.5-h74c22ad_3.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zlib-ng-2.3.3-h31dac16_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hf451053_7.conda
+      - conda: https://prefix.dev/almost-conductor/osx-arm64/denet-0.10.3-h60d57d3_0.conda
       - pypi: https://files.pythonhosted.org/packages/5c/f3/0aeab8eab2fd7776759367cfaf6cdda582cc6ba950d103ee65a3dab0aee8/obkit-0.0.3-py3-none-any.whl
 packages:
 - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
@@ -1149,6 +1156,20 @@ packages:
   license_family: MIT
   size: 191489
   timestamp: 1777461498522
+- conda: https://conda.anaconda.org/conda-forge/linux-64/denet-0.10.3-hf19af3b_0.conda
+  sha256: d76c5f70cc28c30458005391593014053c373a99db827ac94623e3f8824126b0
+  md5: 2b59884e224dd50f5d080452717b7716
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=15
+  constrains:
+  - __glibc >=2.17
+  license: GPL-3.0-or-later
+  purls:
+  - pkg:pypi/denet
+  run_exports: {}
+  size: 955811
+  timestamp: 1791395640220
 - conda: https://conda.anaconda.org/conda-forge/linux-64/fontconfig-2.18.1-h27c8c51_0.conda
   sha256: 2e50bdcebdf70a865b81f2456bbc586386451ec601c60f2b6cd22b8c40a2d384
   md5: e0e050cfa9fa85fe39632ab11cb7f3e0
@@ -2384,7 +2405,7 @@ packages:
   license: Apache-2.0
   license_family: Apache
   purls:
-  - pkg:pypi/msgpack?source=compressed-mapping
+  - pkg:pypi/msgpack?source=hash-mapping
   size: 103513
   timestamp: 1782070374726
 - conda: https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.5-h2d0b736_3.conda
@@ -2693,7 +2714,7 @@ packages:
   - __glibc >=2.17
   license: MIT
   purls:
-  - pkg:pypi/polars-runtime-32?source=compressed-mapping
+  - pkg:pypi/polars-runtime-32?source=hash-mapping
   size: 41917352
   timestamp: 1782310371941
 - conda: https://conda.anaconda.org/conda-forge/linux-64/pthread-stubs-0.4-hb9d3cd8_1002.conda
@@ -2929,7 +2950,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/scipy?source=compressed-mapping
+  - pkg:pypi/scipy?source=hash-mapping
   size: 17260022
   timestamp: 1781912924009
 - conda: https://conda.anaconda.org/conda-forge/linux-64/statsmodels-0.14.6-py314hc02f841_0.conda
@@ -3051,7 +3072,7 @@ packages:
   license: BSD-2-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/wrapt?source=compressed-mapping
+  - pkg:pypi/wrapt?source=hash-mapping
   size: 118096
   timestamp: 1782133651496
 - conda: https://conda.anaconda.org/conda-forge/linux-64/xorg-libice-1.1.2-hb9d3cd8_0.conda
@@ -3240,7 +3261,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/anndata?source=compressed-mapping
+  - pkg:pypi/anndata?source=hash-mapping
   size: 137382
   timestamp: 1782293841619
 - conda: https://conda.anaconda.org/conda-forge/noarch/anndata-0.12.19-pyhd8ed1ab_0.conda
@@ -3386,7 +3407,7 @@ packages:
   - python >=3.10
   license: ISC
   purls:
-  - pkg:pypi/certifi?source=compressed-mapping
+  - pkg:pypi/certifi?source=hash-mapping
   size: 133877
   timestamp: 1781719949728
 - conda: https://conda.anaconda.org/conda-forge/noarch/certifi-2026.7.22-pyhd8ed1ab_0.conda
@@ -3718,7 +3739,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/narwhals?source=compressed-mapping
+  - pkg:pypi/narwhals?source=hash-mapping
   size: 285532
   timestamp: 1780672242196
 - conda: https://conda.anaconda.org/conda-forge/noarch/narwhals-2.25.0-pyhcf101f3_0.conda
@@ -3730,7 +3751,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/narwhals?source=compressed-mapping
+  - pkg:pypi/narwhals?source=hash-mapping
   run_exports: {}
   size: 293989
   timestamp: 1787261063562
@@ -3811,7 +3832,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/pip?source=compressed-mapping
+  - pkg:pypi/pip?source=hash-mapping
   size: 1202377
   timestamp: 1780262809860
 - conda: https://conda.anaconda.org/conda-forge/noarch/pip-26.2.1-pyh145f28c_0.conda
@@ -3889,7 +3910,7 @@ packages:
   - polars-runtime-compat ==1.42.0
   license: MIT
   purls:
-  - pkg:pypi/polars?source=compressed-mapping
+  - pkg:pypi/polars?source=hash-mapping
   size: 541978
   timestamp: 1782310371941
 - conda: https://conda.anaconda.org/conda-forge/noarch/polars-1.44.1-pyh8da0edf_0.conda
@@ -3916,7 +3937,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/polars?source=compressed-mapping
+  - pkg:pypi/polars?source=hash-mapping
   run_exports: {}
   size: 558812
   timestamp: 1787748957373
@@ -4010,7 +4031,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/pytest?source=compressed-mapping
+  - pkg:pypi/pytest?source=hash-mapping
   run_exports: {}
   size: 306724
   timestamp: 1782127176429
@@ -4199,7 +4220,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/scanpy?source=compressed-mapping
+  - pkg:pypi/scanpy?source=hash-mapping
   run_exports: {}
   size: 2000871
   timestamp: 1787906496712
@@ -4241,7 +4262,7 @@ packages:
   - python
   license: BSD-3-Clause
   purls:
-  - pkg:pypi/scverse-misc?source=compressed-mapping
+  - pkg:pypi/scverse-misc?source=hash-mapping
   run_exports: {}
   size: 28600
   timestamp: 1787916451332
@@ -4396,7 +4417,7 @@ packages:
   - ipywidgets >=6.0
   license: MPL-2.0 and MIT
   purls:
-  - pkg:pypi/tqdm?source=compressed-mapping
+  - pkg:pypi/tqdm?source=hash-mapping
   size: 94965
   timestamp: 1781741268338
 - conda: https://conda.anaconda.org/conda-forge/noarch/tqdm-4.70.0-pyh8f84b5b_0.conda
@@ -4939,7 +4960,7 @@ packages:
   license: BSD-3-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/h5py?source=compressed-mapping
+  - pkg:pypi/h5py?source=hash-mapping
   run_exports: {}
   size: 1154631
   timestamp: 1787109201804
@@ -5783,7 +5804,7 @@ packages:
   license: BSD-2-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/llvmlite?source=compressed-mapping
+  - pkg:pypi/llvmlite?source=hash-mapping
   run_exports: {}
   size: 30501800
   timestamp: 1787685894632
@@ -5827,7 +5848,7 @@ packages:
   - python_abi 3.14.* *_cp314
   license: Apache-2.0
   purls:
-  - pkg:pypi/msgpack?source=compressed-mapping
+  - pkg:pypi/msgpack?source=hash-mapping
   run_exports: {}
   size: 101639
   timestamp: 1787850896574
@@ -5865,7 +5886,7 @@ packages:
   license: BSD-2-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/numba?source=compressed-mapping
+  - pkg:pypi/numba?source=hash-mapping
   run_exports: {}
   size: 6198899
   timestamp: 1787145537651
@@ -6248,7 +6269,7 @@ packages:
   - numpy >=1.25,<3
   license: BSD-3-Clause
   purls:
-  - pkg:pypi/statsmodels?source=compressed-mapping
+  - pkg:pypi/statsmodels?source=hash-mapping
   run_exports: {}
   size: 13740212
   timestamp: 1787851653443
@@ -6397,6 +6418,14 @@ packages:
     - zstd >=1.5.7,<1.6.0a0
   size: 433687
   timestamp: 1786599629846
+- conda: https://prefix.dev/almost-conductor/osx-arm64/denet-0.10.3-h60d57d3_0.conda
+  sha256: d2bcfca1e3ad6172395f492f9ed9bbe0093b962f89fc8e9ba93a5fea72e46f93
+  md5: b608062442149a155ab195516028f2f6
+  constrains:
+  - __osx >=11.0
+  run_exports: {}
+  size: 671264
+  timestamp: 1790703934573
 - pypi: https://files.pythonhosted.org/packages/5c/f3/0aeab8eab2fd7776759367cfaf6cdda582cc6ba950d103ee65a3dab0aee8/obkit-0.0.3-py3-none-any.whl
   name: obkit
   version: 0.0.3
