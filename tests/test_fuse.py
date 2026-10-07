@@ -10,14 +10,15 @@ import scipy.sparse as sp
 import fuse
 from steps import STEPS, GraphT, plan
 
-P = ["--solver", "arpack", "--n_components", "10", "--n_neighbors", "10",
-     "--knn_transformer", "sklearn", "--resolution", "1.0", "--leiden_flavor", "igraph",
-     "--random_seed", "0"]
+PARAMS = {"solver": "arpack", "n_components": "10", "dtype": "float64", "n_neighbors": "10",
+          "knn_transformer": "sklearn", "resolution": "1.0", "leiden_flavor": "igraph", "random_seed": "0"}
 
 
 def _params(stages):
-    keep = {k for s in stages for k in STEPS[s].params}
-    return [x for i in range(0, len(P), 2) if P[i][2:] in keep for x in P[i:i + 2]]
+    return [x for s in stages for k in STEPS[s].params for x in (f"--{s.lower()}_{k}", PARAMS[k])]
+
+
+P = _params(["PCA", "NNG", "CLUST"])
 
 
 @pytest.fixture
@@ -108,8 +109,7 @@ def freeze(x):
 
 
 def _step_params(stage):
-    args = dict(zip((k[2:] for k in P[::2]), P[1::2]))
-    return {k: t(args[k]) for k, t in STEPS[stage].params.items()}
+    return {k: t(PARAMS[k]) for k, t in STEPS[stage].params.items()}
 
 
 def _chain(adata, guard):

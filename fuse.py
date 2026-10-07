@@ -36,12 +36,10 @@ def parse_args(argv=None):
     p.add_argument("--threads", type=int, default=0)
     for k in external:
         p.add_argument(f"--{k}", type=Path, required=True)
-    seen = {}
+    # step parameters are namespaced by stage: --pca_dtype, --nng_n_neighbors, --clust_random_seed
     for st in (STEPS[s] for s in stages):
         for k, t in st.params.items():
-            assert seen.setdefault(k, t) is t, f"param {k} has two types"
-    for k, t in seen.items():
-        p.add_argument(f"--{k}", type=t, required=True)
+            p.add_argument(f"--{st.stage.lower()}_{k}", type=t, required=True)
     return p.parse_args(argv), stages, external
 
 
@@ -57,7 +55,7 @@ def main(argv=None):
     saves = []
     for st in (STEPS[s] for s in stages):
         with phase(st.stage.lower()):
-            res = st.run({k: env[k] for k in st.inputs}, {k: a[k] for k in st.params})
+            res = st.run({k: env[k] for k in st.inputs}, {k: a[f"{st.stage.lower()}_{k}"] for k in st.params})
         env.update(res)
         saves += [(k, st.outputs[k]) for k in res]
     with phase("write"):
