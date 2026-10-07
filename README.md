@@ -85,3 +85,29 @@ convergence; its knobs do not map onto power iterations / oversamples. Note:
 rapids' halko PCA is not bit-reproducible between identical runs (GPU; max
 |diff| ~2e-3 on tm-facs, the size of scanpy's whole seed effect).
 
+
+## PICK stage contract (resolution pickers)
+
+A picker chooses one Leiden resolution from a CLUST-SWEEP table without ground-truth
+labels; CLUST then runs at that resolution via `cluster --pick_json`. Pickers are
+modules of one PICK stage, so the benchmark fans out and compares them.
+
+- **Inputs:** `--clusters_sweep_tsv` (cell_id + one column per resolution), plus
+  whatever the picker needs: `--rawdata_h5ad` (raw counts in `layers["counts"]`),
+  `--properties_info`.
+- **Output:** `{name}_pick.json` with at least `"resolution"` (a column of the sweep),
+  `"rule"` (one line stating how it was chosen) and `"scores"` (one record per scored
+  resolution, so the choice can be audited).
+- **No labels.** A picker never reads `rawdata_clusters_truth`.
+- **Count type.** Pickers that assume a count model (scSHC's null, count splitting /
+  data thinning, anything negative-binomial) are valid for UMI counts only. Read
+  counts (Smart-seq2, e.g. Tabula Muris FACS) are compound PCR/fragment counts: one
+  molecule gives many reads, so count-splitting halves share noise and model-based
+  tests are miscalibrated, erring toward more clusters. Datasets should declare
+  `count_type: umi | reads` in `{dataset}_properties.yaml` (not yet written by
+  omni-tabula-muris; FACS = reads, droplet = umi), and model-based pickers should
+  refuse `reads` unless forced, recording that in `"rule"`. Model-free pickers
+  (stability-based) need no such check.
+
+Implemented: `pick-scshc` (PoC; R side via an external env, `--rscript`; does not yet
+check `count_type`).
