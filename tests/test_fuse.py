@@ -50,3 +50,90 @@ def test_fused_equals_split(tmp_path, h5ad):
 def test_chain_typecheck():
     assert set(plan(["PCA", "NNG", "CLUST"])) == {"data_h5ad"}
     assert set(plan(["NNG"])) == {"embedding_tsv"}
+
+
+# --- purity guards (tests only; never in timed runs) --------------------------
+
+import sys
+from contextlib import contextmanager, nullcontext
+
+import scipy.sparse as sp
+
+from steps import Clusters, Embedding, Graph, Matrix
+
+_guard = {"dirs": None}
+
+
+def _hook(event, args):
+    dirs = _guard["dirs"]
+    if dirs is None:
+        return
+    if event in ("socket.connect", "subprocess.Popen", "os.system", "os.exec", "os.posix_spawn"):
+        raise RuntimeError(f"impure step: {event}")
+    if event == "open":
+        path, mode = str(args[0]), args[1] or "r"
+        if any(c in str(mode) for c in "wax+") or any(path.startswith(d) for d in dirs):
+            raise RuntimeError(f"impure step: open({path!r}, {mode!r})")
+
+
+sys.addaudithook(_hook)  # can't be removed; inert while _guard["dirs"] is None
+
+
+@contextmanager
+def no_io(*dirs):
+    """Inside: no writes anywhere, no reads under `dirs` (the data), no network or subprocesses.
+    Blind spot: C libraries that open files themselves (e.g. HDF5) bypass audit hooks."""
+    _guard["dirs"] = [str(d) for d in dirs]
+    try:
+        yield
+    finally:
+        _guard["dirs"] = None
+
+
+def freeze(x):
+    """Make every array reachable from a step input read-only, so in-place edits raise."""
+    if isinstance(x, np.ndarray):
+        x.flags.writeable = False
+    elif sp.issparse(x):
+        for a in (x.data, x.indices, x.indptr):
+            a.flags.writeable = False
+    elif isinstance(x, ad.AnnData):
+        freeze(x.X)
+    elif isinstance(x, Embedding):
+        freeze(x.matrix)
+    elif isinstance(x, Graph):
+        freeze(x.distances)
+        freeze(x.connectivities)
+    return x
+
+
+def _step_params(stage):
+    args = dict(zip((k[2:] for k in P[::2]), P[1::2]))
+    return {k: t(args[k]) if k in args else 0 for k, t in STEPS[stage].params.items()}
+
+
+def _chain(adata, guard):
+    env = {"data_h5ad": freeze(adata)}
+    for stage in ("PCA", "NNG", "CLUST"):
+        st = STEPS[stage]
+        with guard():
+            out = st.run({k: env[k] for k in st.inputs}, _step_params(stage))
+        assert set(out) == set(st.outputs)
+        env.update({k: freeze(v) for k, v in out.items()})
+    return env
+
+
+def test_steps_are_pure(tmp_path, h5ad):
+    adata = Matrix.load(h5ad)
+    _chain(adata, nullcontext)  # unguarded warm-up: lazy imports and JIT caches touch the filesystem
+    env = _chain(adata, lambda: no_io(tmp_path))
+    assert isinstance(env["clusters_tsv"], Clusters)
+    assert "X_pca" not in adata.obsm, "PCA wrote into its input"
+
+
+def test_guards_fire(tmp_path):
+    (tmp_path / "side.txt").write_text("x")
+    with pytest.raises(RuntimeError, match="impure"), no_io(tmp_path):
+        open(tmp_path / "side.txt").read()
+    with pytest.raises(ValueError, match="read-only"):
+        freeze(np.zeros(3))[0] = 1

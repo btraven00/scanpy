@@ -13,6 +13,7 @@ and a split run write the same files.
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, Callable, TypedDict, get_type_hints
 
 import anndata as ad
 import numpy as np
@@ -103,24 +104,47 @@ class ClustersT:
 
 
 # --- steps -------------------------------------------------------------------
+# A step's contract is its typed signature: run(ins: <In>, p: <Params>) -> <Out>.
+# mypy checks each implementation against it (`pixi run -e test typecheck`), and the
+# runner reads the same TypedDicts at runtime, so the contract is written down once.
 
-@dataclass
-class Step:
-    stage: str
-    inputs: dict   # input id -> type
-    outputs: dict  # output id -> type
-    params: dict   # param name -> python type
-    run: callable
+IO = {ad.AnnData: Matrix, Embedding: EmbeddingT, Graph: GraphT, Clusters: ClustersT}
 
 
-def _pca(ins, p):
+class PCAIn(TypedDict):
+    data_h5ad: ad.AnnData
+
+class PCAOut(TypedDict):
+    embedding_tsv: Embedding
+
+class PCAParams(TypedDict):
+    solver: str
+    n_components: int
+    blas_threads: int
+    random_seed: int
+
+def pca_step(ins: PCAIn, p: PCAParams) -> PCAOut:
     from pca import run_pca
-    adata = ins["data_h5ad"]
+    src = ins["data_h5ad"]
+    # Fresh AnnData that shares X: sc.pp.pca writes obsm/varm/uns into the object
+    # it gets, and the caller's input must not change. X is not copied.
+    adata = ad.AnnData(X=src.X, obs=src.obs[[]], var=src.var[[]])
     emb, *_ = run_pca(adata, SimpleNamespace(**p))
     return {"embedding_tsv": Embedding(emb, list(adata.obs_names), [f"PC{i + 1}" for i in range(emb.shape[1])])}
 
 
-def _nng(ins, p):
+class NNGIn(TypedDict):
+    embedding_tsv: Embedding
+
+class NNGOut(TypedDict):
+    neighbors_h5: Graph
+
+class NNGParams(TypedDict):
+    n_neighbors: int
+    knn_transformer: str  # sklearn = exact; scanpy's default is pynndescent (approximate) above 4096 cells
+    random_seed: int
+
+def nng_step(ins: NNGIn, p: NNGParams) -> NNGOut:
     e = ins["embedding_tsv"]
     a = ad.AnnData(X=np.zeros((len(e.row_ids), 1)))
     a.obs_names = e.row_ids
@@ -130,7 +154,18 @@ def _nng(ins, p):
     return {"neighbors_h5": Graph(a.obsp["distances"], a.obsp["connectivities"], list(a.obs_names))}
 
 
-def _clust(ins, p):
+class CLUSTIn(TypedDict):
+    neighbors_h5: Graph
+
+class CLUSTOut(TypedDict):
+    clusters_tsv: Clusters
+
+class CLUSTParams(TypedDict):
+    resolution: float
+    leiden_flavor: str
+    random_seed: int
+
+def clust_step(ins: CLUSTIn, p: CLUSTParams) -> CLUSTOut:
     from cluster import cluster_leiden
     g = ins["neighbors_h5"]
     a = ad.AnnData(X=np.zeros((len(g.cell_ids), 1)))
@@ -141,16 +176,28 @@ def _clust(ins, p):
     return {"clusters_tsv": Clusters(g.cell_ids, labels)}
 
 
-STEPS = {s.stage: s for s in [
-    Step("PCA", {"data_h5ad": Matrix}, {"embedding_tsv": EmbeddingT},
-         {"solver": str, "n_components": int, "blas_threads": int, "random_seed": int}, _pca),
-    # scanpy's default (None) is pynndescent above 4096 cells, i.e. approximate; sklearn is exact.
-    Step("NNG", {"embedding_tsv": EmbeddingT}, {"neighbors_h5": GraphT},
-         {"n_neighbors": int, "knn_transformer": str, "random_seed": int}, _nng),
-    Step("CLUST", {"neighbors_h5": GraphT}, {"clusters_tsv": ClustersT},
-         {"resolution": float, "leiden_flavor": str, "random_seed": int}, _clust),
-]}
+@dataclass
+class Step:
+    stage: str
+    run: Callable[..., Any]
 
+    def _hints(self, arg):
+        return get_type_hints(get_type_hints(self.run)[arg])
+
+    @property
+    def inputs(self):   # input id -> IO class
+        return {k: IO[t] for k, t in self._hints("ins").items()}
+
+    @property
+    def outputs(self):  # output id -> IO class
+        return {k: IO[t] for k, t in self._hints("return").items()}
+
+    @property
+    def params(self):   # param name -> python type
+        return self._hints("p")
+
+
+STEPS = {s.stage: s for s in [Step("PCA", pca_step), Step("NNG", nng_step), Step("CLUST", clust_step)]}
 
 def plan(stages):
     """Typecheck a chain. Returns the external inputs: ids that no earlier step produces."""

@@ -35,9 +35,12 @@ sync = "sh -c 'curl -fsSL https://raw.githubusercontent.com/omni-scrna/boilerpla
 # test feature layers pytest onto the default runtime env
 [feature.test.dependencies]
 pytest = ">=8"
+mypy = ">=1.11"
 
 [feature.test.tasks]
 test = "pytest"
+# step contracts only: the rest of the module predates type hints
+typecheck = "mypy --ignore-missing-imports --follow-imports=silent src/steps.py fuse.py"
 
 [environments]
 dev = { features = ["dev"], no-default-feature = true }
