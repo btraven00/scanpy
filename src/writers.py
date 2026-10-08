@@ -82,10 +82,15 @@ def write_graph(obj, path, format="h5"):
     with h5py.File(path, "w") as h5:
         # dtype="S": h5py can't write numpy unicode ('<U') arrays
         h5.create_dataset("cell_ids", data=np.array(obj.row_ids, dtype="S"))
-        for grp, m in ((h5, obj.distances), (h5.create_group("connectivities"), obj.connectivities)):
-            m = m.tocsr()
-            for k in ("data", "indices", "indptr"):
-                grp.create_dataset(k, data=getattr(m, k))
+        _write_csr(h5, obj.distances)  # root first, then the group: same file layout as before
+        _write_csr(h5.create_group("connectivities"), obj.connectivities)
+
+
+def _write_csr(grp, m):
+    m = m.tocsr()
+    grp.create_dataset("data",    data=m.data)
+    grp.create_dataset("indices", data=m.indices)
+    grp.create_dataset("indptr",  data=m.indptr)
 
 
 def read_graph(path, format="h5"):
