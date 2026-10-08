@@ -146,6 +146,21 @@ def test_warmup_is_invisible_in_outputs(tmp_path, h5ad):
     fuse.main(["--output_dir", str(w), "--name", "x", "--steps", "PCA,NNG,CLUST", "--data_h5ad", str(h5ad),
                "--warmup_cells", "100"] + P)
     ev = [json.loads(l)["event"] for l in open(w / "obkit-events.jsonl") if '"end"' in l]
-    assert ev == ["load", "warmup:pca", "warmup:nng", "warmup:clust", "pca", "nng", "clust", "write"]
+    assert ev == ["load", "warmup:pca", "warmup:nng", "warmup:clust", "pca", "nng", "clust", "replicate", "write", "exit"]
     for name in ("x_embedding.tsv", "x_clusters.tsv"):
         assert (w / name).read_bytes() == (c / name).read_bytes(), name
+
+
+def test_replicates_match_fresh_processes(tmp_path, h5ad):
+    """In-process replicate r == a fresh run with its seeds: no state carried between replicates."""
+    import json
+    loop, fresh = tmp_path / "loop", tmp_path / "fresh"
+    fuse.main(["--output_dir", str(loop), "--name", "x", "--steps", "PCA,NNG,CLUST", "--data_h5ad", str(h5ad),
+               "--replicates", "3", "--seed_stride", "1"] + P)
+    fuse.main(["--output_dir", str(fresh), "--name", "x", "--steps", "PCA,NNG,CLUST", "--data_h5ad", str(h5ad)]
+              + [v if not P[i - 1].endswith("_random_seed") else "2" for i, v in enumerate(P)])
+    assert (loop / "rep2" / "x_clusters.tsv").read_bytes() == (fresh / "x_clusters.tsv").read_bytes()
+    assert (loop / "rep0" / "x_clusters.tsv").read_bytes() == (loop / "x_clusters.tsv").read_bytes()
+    ev = [json.loads(l) for l in open(loop / "obkit-events.jsonl")]
+    assert [e["attrs"]["seeds"]["clust_random_seed"] for e in ev if e["event"] == "replicate" and e["phase"] == "end"] == [0, 1, 2]
+    assert ev[-1]["event"] == "exit" and ev[-1]["attrs"]["reason"] == "ok" and ev[-1]["attrs"]["done"] == 3
